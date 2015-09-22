@@ -4,6 +4,7 @@ import java.io.{FileInputStream, FileOutputStream}
 import javax.swing.event.{DocumentEvent, DocumentListener}
 import javax.swing.{KeyStroke, Timer}
 
+import com.alee.laf.WebLookAndFeel
 import de.sciss.coelestis.text.{Anim, KeyFrame, Situation}
 import de.sciss.desktop.{FileDialog, OptionPane}
 import de.sciss.file._
@@ -26,9 +27,11 @@ object App {
   case class MovieConfig(duration: Double = 60.0, fps: Int = 25)
 
   def mkFrame(): Unit = {
+    WebLookAndFeel.install()
+
     val v = text.Visual()
     // v.display.setDoubleBuffered(true)
-    v.displaySize = (1080/2, 1920/2)
+    v.displaySize = (1080/4, 1920/4)
 
     val avCfg   = AutoView.Config()
     avCfg.small = true
@@ -108,6 +111,14 @@ object App {
         mSnapshots.insert(i, KeyFrame(frame, sit))
       }
     }
+    ggSnapshots.preferredSize = {
+      val d = ggSnapshots.preferredSize
+      d.width = math.min(320, d.width)  // WTF
+      d
+    }
+    ggSnapshots.minimumSize  = ggSnapshots.preferredSize
+    ggSnapshots.maximumSize  = ggSnapshots.preferredSize
+
     lazy val ggMoveSnapshot: Button = Button("Move") {
       ggSnapshots.selection.indices.headOption.foreach { row =>
         val old @ KeyFrame(initFrame, sit) = mSnapshots(row)
@@ -290,7 +301,21 @@ object App {
       }
       menuBar = mb
       resizable = false
-      pack().centerOnScreen()
+      pack()
+      size = {
+        val sz = size
+        val b  = peer.getGraphicsConfiguration.getBounds
+        sz.width  = math.min(b.width , sz.width )
+        sz.height = math.min(b.height, sz.height)
+        sz
+      }
+      centerOnScreen()
+      location = {
+        val l = location
+        l.x = math.max(0, l.x)
+        l.y = math.max(0, l.y)
+        l
+      }
       // size      = (640, 480)
 
       // v.display.panTo((-136 + 20, -470 + 20))   // XXX WAT -- where the heck do these values come from?
@@ -310,8 +335,8 @@ object App {
 
     configUpdated()
     // println(s"INITIAL = ${v.display.getTransform}")
-    v.display.panAbs(1080/4, 1920/4)
-    ggText.text = Text.convert(Text.text)
+    v.display.panAbs(1080/8, 1920/8)
+    ggText.text = Text.text
     textUpdated()
   }
 

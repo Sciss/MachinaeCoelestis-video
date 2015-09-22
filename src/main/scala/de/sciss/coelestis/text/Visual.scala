@@ -21,6 +21,7 @@ import javax.imageio.ImageIO
 import javax.swing.JPanel
 
 import com.jhlabs.image.{DiffuseFilter, ThresholdFilter}
+import de.sciss.coelestis.Text
 import de.sciss.file._
 import de.sciss.processor.Processor
 import de.sciss.{kollflitz, numbers}
@@ -229,7 +230,7 @@ object Visual {
       _text = value
 
       import kollflitz.Ops._
-      val x0      = value.replace('\n', ' ').replace("  ", " ")
+      val x0      = Text.convert(value).replace('\n', ' ').replace("  ", " ")
       val words   = x0.toVector.groupWith { (a, b) =>
         a.isLetterOrDigit && b.isLetterOrDigit
       } .map(_.mkString).toVector
@@ -567,7 +568,7 @@ object Visual {
 
       // ------------------------------------------------
 
-      actionAutoZoom = new AutoZoom(this)
+      actionAutoZoom = new AutoZoom(this, maxScale = 1.5)
 
       // initialize the display
       _dsp.addControlListener(new ZoomControl     ())

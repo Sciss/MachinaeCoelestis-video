@@ -22,7 +22,8 @@ lazy val commonSettings = Seq(
     "de.sciss"        %% "play-json-sealed"   % "0.2.0",
     "de.sciss"        %% "scissdsp"           % "1.2.2",
     "de.sciss"        %% "kollflitz"          % "0.2.0",
-    "de.sciss"        %  "prefuse-core"       % "1.0.0"
+    "de.sciss"        %  "prefuse-core"       % "1.0.0",
+    "de.sciss"        %  "weblaf"             % "1.28"
   )
 )
 

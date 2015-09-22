@@ -20,7 +20,7 @@ import prefuse.Display
 import prefuse.action.Action
 import prefuse.util.GraphicsLib
 
-class AutoZoom(main: Visual, frac: Double = 0.01, margin: Int = 20) extends Action {
+class AutoZoom(main: Visual, frac: Double = 0.01, margin: Int = 20, maxScale: Double = 2.0) extends Action {
   // var karlHeinz = 1.0
 
   def run(frac: Double): Unit = {
@@ -48,7 +48,7 @@ class AutoZoom(main: Visual, frac: Double = 0.01, margin: Int = 20) extends Acti
 
     val ds      = display.getScale // * karlHeinz
     val scale1  = scale0 / ds // math.max(Visual.VIDEO_WIDTH_SQR, scale0) / ds
-    val scale2  = math.min(2.0, scale1 * ds) / ds
+    val scale2  = math.min(maxScale, scale1 * ds) / ds
 
     //    val dx      = display.getDisplayX + w * 0.5 * ds
     //    val dy      = display.getDisplayY + h * 0.5 * ds
