@@ -568,7 +568,7 @@ object Visual {
 
       // ------------------------------------------------
 
-      actionAutoZoom = new AutoZoom(this, maxScale = math.sqrt(0.5)) // 1.0)
+      actionAutoZoom = new AutoZoom(this, maxScale = Text.maxScale) // 1.0)
 
       // initialize the display
       _dsp.addControlListener(new ZoomControl     ())
@@ -752,8 +752,9 @@ object Visual {
           } else {
             execOnEDT {
               // val center = startSit.config.size * 0.5
-              display.setTransform(AffineTransform.getTranslateInstance(0, 0))
-              display.panAbs(display.getWidth * 0.5, display.getHeight * 0.5)
+              // display.setTransform(AffineTransform.getTranslateInstance(0, 0))
+              display.setTransform(AffineTransform.getScaleInstance(Text.maxScale, Text.maxScale))
+              display.panAbs(display.getWidth * 0.5 / Text.maxScale, display.getHeight * 0.5 / Text.maxScale)
               // display.zoomAbs(new Point(0, 0), 0.1)
               import JavaConversions._
               setText(startSit.text)

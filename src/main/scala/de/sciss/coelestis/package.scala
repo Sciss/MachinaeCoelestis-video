@@ -25,12 +25,13 @@ package object coelestis {
 
   ///
 
-  def waitForProcessor(p: Processor[Any])(implicit exec: ExecutionContext): Unit = {
+  def waitForProcessor(p: Processor[Any], quit: Boolean = false)(implicit exec: ExecutionContext): Unit = {
     val sync = new AnyRef
     val t = new Thread {
       override def run(): Unit = {
         sync.synchronized(sync.wait())
         Thread.sleep(100)
+        if (quit) sys.exit()
       }
     }
     t.start()

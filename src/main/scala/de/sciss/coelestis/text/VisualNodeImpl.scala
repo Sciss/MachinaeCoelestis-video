@@ -54,8 +54,8 @@ object VisualNodeImpl {
 trait VisualNodeImpl extends VisualNode /* with VisualDataImpl */ {
   import VisualNodeImpl._
 
-  final val scaleX  = math.sqrt(2)
-  final val scaleY  = math.sqrt(0.5)
+  final val scaleX  = 2.0 // math.sqrt(2)
+  final val scaleY  = 0.5 // math.sqrt(0.5)
   final val scaleAT = AffineTransform.getScaleInstance(scaleX, scaleY)
 
   //  private[this] var _pNode: PNode = _

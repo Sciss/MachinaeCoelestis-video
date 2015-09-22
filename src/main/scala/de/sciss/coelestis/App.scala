@@ -24,7 +24,7 @@ import scala.swing.{Action, BorderPanel, BoxPanel, Button, Component, FlowPanel,
 object App {
   def main(args: Array[String]): Unit = runGUI(mkFrame())
 
-  case class MovieConfig(duration: Double = 60.0, fps: Int = 25)
+  case class MovieConfig(duration: Double = 552.0 /* 60.0 */, fps: Int = 25)
 
   def mkFrame(): Unit = {
     WebLookAndFeel.install()
@@ -168,8 +168,8 @@ object App {
 
       def apply(): Unit = {
         val anim: Anim  = mSnapshots.toVector
-        val initName    = anim.hashCode().toHexString
-        FileDialog.save(init = Some(userHome / s"text_$initName.png")).show(None).foreach { f =>
+        // val initName    = anim.hashCode().toHexString
+        FileDialog.save(init = Some(userHome / "frame.png" /* s"text_$initName.png" */)).show(None).foreach { f =>
           val pMovie    = AutoView(MovieConfig())
           val optMovie  = OptionPane.confirmation(message = pMovie.component,
             optionType = OptionPane.Options.OkCancel)
