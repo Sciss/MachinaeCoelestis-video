@@ -3,7 +3,6 @@ package de.sciss.coelestis
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
-import com.jhlabs.image.{NoiseFilter, ThresholdFilter}
 import de.sciss.dsp
 import de.sciss.file._
 import de.sciss.processor.Processor
@@ -64,10 +63,29 @@ object Resample {
   }
 
   def mkImage(config: Config, frame: Int): BufferedImage = {
-    val imgCrop   = readFrame(config, frame)
+    val (w, h, imgCrop) = readFrame(config, frame)
     val imgUp     = imgCrop // mkResize (config, imgCrop)
     val imgNoise  = mkNoise  (config, imgUp)
-    mkThresh(config, imgNoise)
+    val arr       = mkThresh(config, imgNoise)
+    bufferToImage(arr, w, h)
+  }
+
+  def bufferToImage(in: Array[Float], width: Int, height: Int, gain: Float = 1f): BufferedImage = {
+    val res = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY)
+    var i = 0
+    var y = 0
+    while (y < height) {
+      var x = 0
+      while (x < width) {
+        val vOut    = (math.max(0f, math.min(1f, in(i) * gain)) * 255 + 0.5f).toInt
+        val rgbOut  = 0xFF000000 | (vOut << 16) | (vOut << 8) | vOut
+        res.setRGB(x, y, rgbOut)
+        x += 1
+        i += 1
+      }
+      y += 1
+    }
+    res
   }
 
 //  def cropImage2(config: Config, in: BufferedImage): BufferedImage = {
@@ -83,11 +101,30 @@ object Resample {
     dirIn  / childIn.replace("%d", frame.toString)
   }
 
-  def readFrame(config: Config, frame: Int): BufferedImage = {
+  def readFrame(config: Config, frame: Int): (Int, Int, Array[Float]) = {
     val fIn1      = mkFIn(config, frame)
     val imgIn     = ImageIO.read(fIn1)
     val imgCrop   = imgIn // cropImage2(config, imgIn)
-    imgCrop
+    val w         = imgCrop.getWidth
+    val h         = imgCrop.getHeight
+
+    val res       = new Array[Float](w * h)
+
+    var y = 0
+    var t = 0
+    while (y < h) {
+      var x = 0
+      while (x < w) {
+        val rgbIn = imgCrop.getRGB(x, y)
+        val vIn = (((rgbIn & 0xFF0000) >> 16) + ((rgbIn & 0x00FF00) >> 8) + (rgbIn & 0x0000FF)) / 765f // it's gray anyway
+        res(t) = vIn
+        x += 1
+        t += 1
+      }
+      y += 1
+    }
+
+    (w, h, res)
   }
 
 //  def mkResize(config: Config, in: BufferedImage): BufferedImage = {
@@ -96,22 +133,45 @@ object Resample {
 //    resizeOp.filter(in, null)
 //  }
 
-  def mkNoise(config: Config, in: BufferedImage): BufferedImage = if (config.noise <= 0) in else {
-    val noiseOp = new NoiseFilter
-    noiseOp.setAmount(config.noise)
-    noiseOp.setMonochrome(true)
-    noiseOp.filter(in, null)
+  private[this] val rnd = new util.Random
+
+  def mkNoise(config: Config, in: Array[Float]): Array[Float] = if (config.noise <= 0) in else {
+//    val noiseOp = new NoiseFilter
+//    noiseOp.setAmount(config.noise)
+//    noiseOp.setMonochrome(true)
+//    noiseOp.filter(in, null)
+    val amt  = config.noise / 255f
+    val amtH = amt/2
+    var i = 0
+    val out = new Array[Float](in.length)
+    while (i < in.length) {
+      val noise = rnd.nextFloat() * amt - amtH
+      out(i) = in(i) + noise
+      i += 1
+    }
+    out
   }
 
   def mkCopy(in: BufferedImage): BufferedImage = cropImage(in, 0, 0, in.getWidth, in.getHeight)
 
-  def mkThresh(config: Config, in: BufferedImage, out: BufferedImage = null): BufferedImage =
+  def mkThresh(config: Config, in: Array[Float], out: Array[Float] = null): Array[Float] =
     if (config.thresh <= 0) in else {
       import config.thresh
-      val threshOp  = new ThresholdFilter(thresh)
-      val out1      = if (out != null) out else new BufferedImage(in.getWidth, in.getHeight, BufferedImage.TYPE_BYTE_BINARY)
-      threshOp.filter(in, out1)
+//      val threshOp  = new ThresholdFilter(thresh)
+//      val out1      = if (out != null) out else new BufferedImage(in.getWidth, in.getHeight, BufferedImage.TYPE_BYTE_BINARY)
+//      threshOp.filter(in, out1)
+      val res = if (out == null) new Array[Float](in.length) else out
+      var i = 0
+      val amt = thresh / 255f
+      while (i < in.length) {
+        res(i) = if (in(i) > amt) 1f else 0f
+        i += 1
+      }
+      res
     }
+
+  def printSum(prefix: String, in: Array[Float]): Unit = println(s"$prefix: ${in.sum}")
+
 
   private final class RenderImageSequence(config: Config)
     extends ProcessorImpl[Unit, RenderImageSequence] with Processor[Unit] {
@@ -137,11 +197,12 @@ object Resample {
       // val frameOff      = firstFrame // if (lastFrame >= firstFrame) firstFrame else lastFrame
       val numOutFrames  = numInFrames * 2
 
-      var frame0      = readFrame(config, frameSeq(0) /* frameOff */)
-      val widthIn     = frame0.getWidth
-      val heightIn    = frame0.getHeight
+      var (widthIn0, heightIn0, frame0) = readFrame(config, frameSeq(0))
+      val widthIn   = widthIn0
+      val heightIn  = heightIn0
+      val arrSize   = widthIn * heightIn
 
-      val imgOut        = new BufferedImage(widthIn, heightIn, BufferedImage.TYPE_BYTE_BINARY)
+      // val imgOut        = new BufferedImage(widthIn, heightIn, BufferedImage.TYPE_BYTE_BINARY)
 
       def mkFOut(frame: Int): File = dirOut / s"$childOut-${frame + outputOffset - 1}.png"
 
@@ -153,25 +214,25 @@ object Resample {
 
       val frameWindow = Array.tabulate(rsmpWin) { i =>
         val j = i - winH
-        if (j <= 0) frame0 else readFrame(config, frameSeq(j) /* j * frameInMul + frameOff*/)
+        if (j <= 0) frame0 else readFrame(config, frameSeq(j) /* j * frameInMul + frameOff*/)._3
       }
 
       frame0 = null // let it be GC'ed
 
       val resample    = dsp.Resample(dsp.Resample.Quality.High /* Medium */ /* Low */)
-      val imgRsmp     = Array.fill(2)(new BufferedImage(widthIn, heightIn, BufferedImage.TYPE_BYTE_GRAY))
+      val imgRsmp     = Array.fill(2)(new Array[Float](arrSize)) // new BufferedImage(widthIn, heightIn, BufferedImage.TYPE_BYTE_GRAY))
       val bufRsmpIn   = new Array[Float](rsmpWin)
       val bufRsmpOut  = new Array[Float](2)
 
       def performResample(): Unit = {
         var y = 0
+        var z = 0
         while (y < heightIn) {
           var x = 0
           while (x < widthIn) {
             var t = 0
             while (t < rsmpWin) {
-              val rgbIn = frameWindow(t).getRGB(x, y)
-              val vIn = (((rgbIn & 0xFF0000) >> 16) + ((rgbIn & 0x00FF00) >> 8) + (rgbIn & 0x0000FF)) / 765f // it's gray anyway
+              val vIn = frameWindow(t)(z)
               bufRsmpIn(t) = vIn
               t += 1
             }
@@ -179,12 +240,13 @@ object Resample {
             var off = 0
             while (off < 2) {
               // note: gain factor 2 here!
-              val vOut    = (math.max(0f, math.min(1f, bufRsmpOut(off) * 2)) * 255 + 0.5f).toInt
-              val rgbOut  = 0xFF000000 | (vOut << 16) | (vOut << 8) | vOut
-              imgRsmp(off).setRGB(x, y, rgbOut)
+              // val vOut    = (math.max(0f, math.min(1f, bufRsmpOut(off) * 2)) * 255 + 0.5f).toInt
+              // val rgbOut  = 0xFF000000 | (vOut << 16) | (vOut << 8) | vOut
+              imgRsmp(off)(z) = bufRsmpOut(off) * 2 // .setRGB(x, y, rgbOut)
               off += 1
             }
             x += 1
+            z += 1
           }
           y += 1
         }
@@ -201,10 +263,14 @@ object Resample {
           var off = 0
           while (off < 2) {
             val imgCrop   = imgRsmp(off)
+
+            // printSum(s"rsmp($frameOut)", imgCrop)
+
             val imgUp     = imgCrop // mkCopy(imgCrop) // mkResize(config, imgCrop)
             val imgNoise  = mkNoise(config, imgUp)
-            val imgOut1   = mkThresh(config, imgNoise, imgOut)
-            ImageIO.write(imgOut1, "png", if (off == 0) fOut1 else fOut2)
+            val imgOut1   = mkThresh(config, imgNoise, null) // imgOut)
+            val imgOut2   = bufferToImage(imgOut1, widthIn, heightIn)
+            ImageIO.write(imgOut2, "png", if (off == 0) fOut1 else fOut2)
             off += 1
           }
         }
@@ -212,7 +278,7 @@ object Resample {
         // handle overlap
         System.arraycopy(frameWindow, 1, frameWindow, 0, rsmpWin - 1)
         if (frameIn < numInFrames) {
-          frameWindow(rsmpWin - 1) = readFrame(config, frameSeq(frameIn) /* frameIn * frameInMul + frameOff */)
+          frameWindow(rsmpWin - 1) = readFrame(config, frameSeq(frameIn) /* frameIn * frameInMul + frameOff */)._3
         }
 
         frameIn  += 1
