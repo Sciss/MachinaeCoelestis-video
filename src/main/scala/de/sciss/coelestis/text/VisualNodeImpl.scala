@@ -54,6 +54,10 @@ object VisualNodeImpl {
 trait VisualNodeImpl extends VisualNode /* with VisualDataImpl */ {
   import VisualNodeImpl._
 
+  final val scaleX  = math.sqrt(2)
+  final val scaleY  = math.sqrt(0.5)
+  final val scaleAT = AffineTransform.getScaleInstance(scaleX, scaleY)
+
   //  private[this] var _pNode: PNode = _
   //
   //  def dispose(): Unit = {
@@ -191,13 +195,15 @@ trait VisualNodeImpl extends VisualNode /* with VisualDataImpl */ {
         val x = 2
         val y = 12
 
-        labelShape = v.getOutline(x, y)
-        lastFontT = frcT
-        lastLabel = text
+        labelShape  = v.getOutline(x, y)
+        labelShape  = scaleAT.createTransformedShape(labelShape)
+        lastFontT   = frcT
+        lastLabel   = text
       }
       g.fill(labelShape)
 
     } else {
+      ???
       val cx = r.getWidth  / 2
       val cy = r.getHeight / 2
       val fm = g.getFontMetrics
@@ -215,10 +221,10 @@ trait VisualVertexImpl extends VisualNodeImpl {
 
   protected def fontSize: Float = 16f
 
-  def advance: Int = {
+  def advance: Double = {
     checkFont()
     val fm = Renderer.DEFAULT_GRAPHICS.getFontMetrics(font)
-    fm.charWidth(character)
+    fm.charWidth(character) * scaleX
   }
 
   def getShape(x: Double, y: Double): Shape = {
@@ -230,7 +236,7 @@ trait VisualVertexImpl extends VisualNodeImpl {
     // val ports = data.ports
     // val w3    = math.max(ports.numIns, ports.numOuts) * VisualPorts.MinSpacing
     val w     = w2 // math.max(w2, w3)
-    r.setRect(x, y, w, BoxRenderer.DefaultBoxHeight)
+    r.setRect(x, y, w * scaleX, BoxRenderer.DefaultBoxHeight * scaleY)
     r
   }
 }

@@ -300,7 +300,7 @@ object Visual {
         w
       }
 
-      @tailrec def mkLines(words: Vec[Word], rem: Vec[Word], width: Int, res: Vec[Line]): Vec[Line] = {
+      @tailrec def mkLines(words: Vec[Word], rem: Vec[Word], width: Double, res: Vec[Line]): Vec[Line] = {
         def flush(): Line = {
           words.foreachPair { (pred, succ) =>
             val n1 = pred.letters.last.pNode
@@ -568,7 +568,7 @@ object Visual {
 
       // ------------------------------------------------
 
-      actionAutoZoom = new AutoZoom(this, maxScale = 1.5)
+      actionAutoZoom = new AutoZoom(this, maxScale = math.sqrt(0.5)) // 1.0)
 
       // initialize the display
       _dsp.addControlListener(new ZoomControl     ())

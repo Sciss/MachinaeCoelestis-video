@@ -71,7 +71,7 @@ object VisualVertex {
 sealed trait VisualVertex extends VisualNode {
   def character: Char
 
-  def advance: Int
+  def advance: Double
 
   def pNode: PNode
 

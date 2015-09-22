@@ -93,7 +93,7 @@ object Text extends TextLike {
   def convert(in: String): String = in.map(charMap(_))
 
   lazy val config: Config =
-    Config(width = 1080, height = 1920, lineWidth = 160 /* 320 */, speedLimit = 0.1, noise = 0, threshold = 0)
+    Config(width = 1080, height = 1920, lineWidth = 320, speedLimit = 0.1, noise = 0, threshold = 0)
 
   lazy val tail = 120
 

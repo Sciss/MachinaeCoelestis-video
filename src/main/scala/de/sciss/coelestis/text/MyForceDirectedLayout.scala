@@ -29,7 +29,7 @@ class MyForceDirectedLayout(main: Visual)
         if (vSrc.lineRef eq vDst.lineRef) {
           val res = vSrc.advance
           // println(s"ADVANCE = $res")
-          res
+          res.toFloat
         } else -1
       case _ =>
         // println("Oh noes!")
