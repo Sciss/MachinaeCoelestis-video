@@ -10,6 +10,11 @@ import jwave.transforms.wavelets.daubechies.Daubechies8
 import numbers.Implicits._
 
 object WaveletTest {
+  final val DISPLACE = 8.0
+  final val NOISE    = 0.1
+  final val BOOST    = 1.3
+  final val CUT      = NOISE * BOOST
+
   def main(args: Array[String]): Unit = {
     val wavelet = new Daubechies8
     val trans   = new FastWaveletTransform(wavelet)
@@ -17,24 +22,58 @@ object WaveletTest {
 
     for (i <- 1 to 100) {
       val in1     = readImage2D(file(s"image_out2/frame_rsmp-${i + 5000}.png"))
+      if (NOISE > 0) addNoise(in1, NOISE)
       val w       = in1(0).length
       val h       = in1   .length
-      // val in2     = readImage2D(userHome / "Documents" / "devel" / "Miniaturen15" / "lyapunov_vid" / "image_out" / s"lya_e224f03c-${i + 5000}.png")
-      val in2     = readImage2D(file(s"image_out2/frame_rsmp-${i + 1000}.png"))
+      val in2     = readImage2D(userHome / "Documents" / "devel" / "Miniaturen15" / "lyapunov_vid" / "image_out" / s"lya_e224f03c-${i + 5000}.png")
+      // val in2     = readImage2D(file(s"image_out2/frame_rsmp-${i + 1000}.png"))
       val mat1    = resize(in1, w.nextPowerOfTwo, h.nextPowerOfTwo)
       val mat2    = resize(in2, w.nextPowerOfTwo, h.nextPowerOfTwo)
       val mat1f   = trans.forward(mat1)
       val mat2f   = trans.forward(mat2)
-      mix(mat1f, mat2f, mat1f)
+      mix1(mat1f, mat2f, mat1f)
       val mat3    = trans.reverse(mat1f)
       val out1    = resize(mat3, w, h)
-      writeImage2D(file(s"test_out/wavelet-B-$i.png"), out1)
+      if (BOOST != 1 || CUT != 0) mulAdd(out1, BOOST, -CUT)
+      writeImage2D(file(s"test_out/wavelet-E-$i.png"), out1)
+    }
+  }
+
+  private final val rnd = new util.Random
+
+  def mulAdd(in: Array[Array[Double]], mul: Double, add: Double): Unit = {
+    val height = in.length
+    val width  = in(0).length
+    var y = 0
+    while (y < height) {
+      val ic = in(y)
+      var x = 0
+      while (x < width) {
+        ic(x) = ic(x) * mul + add
+        x += 1
+      }
+      y += 1
+    }
+  }
+
+  def addNoise(in: Array[Array[Double]], amt: Double): Unit = {
+    val width  = in(0).length
+    val height = in   .length
+    var y = 0
+    while (y < height) {
+      val ic = in(y)
+      var x = 0
+      while (x < width) {
+        ic(x) += (rnd.nextDouble() - 0.5) * amt
+        x += 1
+      }
+      y += 1
     }
   }
 
   def mix(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null): Unit = {
-    val height = a.length
     val width  = a(0).length
+    val height = a   .length
     val c = if (out == null) Array.ofDim[Double](height, width) else out
     var y = 0
     while (y < height) {
@@ -53,7 +92,7 @@ object WaveletTest {
         val w1 = (x + 1).nextPowerOfTwo
         val w2 = (w1 + 1) >> 1
 
-        val displace  = bc(x) * 2
+        val displace  = bc(x) * DISPLACE// 2
         val displaceX = x + displace * w2 / width
         val wxj       = displaceX % 1.0
         val wxi       = 1.0 - wxj
@@ -76,6 +115,30 @@ object WaveletTest {
                 a(dyi)(dxj) * wyi * wxj +
                 a(dyj)(dxi) * wyj * wxi +
                 a(dyj)(dxj) * wyj * wxj
+        cc(x) = d
+
+        x += 1
+      }
+      y += 1
+    }
+  }
+
+  def mix1(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null): Unit = {
+    val width  = a(0).length
+    val height = a   .length
+    val c = if (out == null) Array.ofDim[Double](height, width) else out
+    var y = 0
+    while (y < height) {
+      val ac = a(y)
+      val bc = b(y)
+      val cc = c(y)
+      var x = 0
+
+      while (x < width) {
+        // val d = ac(x) hypotx bc(x)
+        // val d = ac(x) absdif bc(x)
+        val d = ac(x) trunc bc(x)
+        // cc(x) = if (((x ^ y) % 2) == 0) ac(x) else bc(x)
         cc(x) = d
 
         x += 1
