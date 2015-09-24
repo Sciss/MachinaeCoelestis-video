@@ -10,36 +10,63 @@ import jwave.transforms.wavelets.daubechies.Daubechies8
 import numbers.Implicits._
 
 object WaveletTest {
-  final val DISPLACE = 8.0
+  final val DISPLACE = 64.0 // 8.0
   final val NOISE    = 0.1
-  final val BOOST    = 1.3
-  final val CUT      = NOISE * BOOST
+  final val BOOST    = 4.0 // 1.3
+  final val CUT      = 0.1 // NOISE * BOOST
 
   def main(args: Array[String]): Unit = {
     val wavelet = new Daubechies8
     val trans   = new FastWaveletTransform(wavelet)
     // val in2     = readImage2D(file("image_out2/frame_rsmp-500.png"))
 
+    var delay: Array[Array[Double]] = null
+
     for (i <- 1 to 100) {
       val in1     = readImage2D(file(s"image_out2/frame_rsmp-${i + 5000}.png"))
       if (NOISE > 0) addNoise(in1, NOISE)
       val w       = in1(0).length
       val h       = in1   .length
-      val in2     = readImage2D(userHome / "Documents" / "devel" / "Miniaturen15" / "lyapunov_vid" / "image_out" / s"lya_e224f03c-${i + 5000}.png")
+
+      if (delay == null) delay = Array.ofDim[Double](h.nextPowerOfTwo, w.nextPowerOfTwo)
+
+      // val in2     = readImage2D(userHome / "Documents" / "devel" / "Miniaturen15" / "lyapunov_vid" / "image_out" / s"lya_748101b5-${i + 3000}.png")
+      val in2     = readImage2D(file("lya_out") / s"lya_748101b5-${i + 3000}.png")
       // val in2     = readImage2D(file(s"image_out2/frame_rsmp-${i + 1000}.png"))
+      normalize(in2)
       val mat1    = resize(in1, w.nextPowerOfTwo, h.nextPowerOfTwo)
       val mat2    = resize(in2, w.nextPowerOfTwo, h.nextPowerOfTwo)
       val mat1f   = trans.forward(mat1)
       val mat2f   = trans.forward(mat2)
-      mix1(mat1f, mat2f, mat1f)
-      val mat3    = trans.reverse(mat1f)
+      // normalize(mat1f)
+      // normalize(mat2f)
+      mix1(mat1f, mat2f, delay)
+      copy(delay, mat1f)
+      val mat3    = trans.reverse(delay)
       val out1    = resize(mat3, w, h)
+      normalize(out1)
       if (BOOST != 1 || CUT != 0) mulAdd(out1, BOOST, -CUT)
-      writeImage2D(file(s"test_out/wavelet-E-$i.png"), out1)
+      writeImage2D(file(s"test_out/wavelet-F-$i.png"), out1)
     }
   }
 
   private final val rnd = new util.Random
+
+  def copy(in: Array[Array[Double]], out: Array[Array[Double]]): Unit = {
+    val height = in.length
+    val width  = in(0).length
+    var y = 0
+    while (y < height) {
+      val ic = in (y)
+      val oc = out(y)
+      var x = 0
+      while (x < width) {
+        oc(x) = ic(x)
+        x += 1
+      }
+      y += 1
+    }
+  }
 
   def mulAdd(in: Array[Array[Double]], mul: Double, add: Double): Unit = {
     val height = in.length
@@ -77,7 +104,7 @@ object WaveletTest {
     val c = if (out == null) Array.ofDim[Double](height, width) else out
     var y = 0
     while (y < height) {
-      val ac = a(y)
+      // val ac = a(y)
       val bc = b(y)
       val cc = c(y)
       var x = 0
@@ -123,7 +150,8 @@ object WaveletTest {
     }
   }
 
-  def mix1(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null): Unit = {
+  def mix1(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null,
+           atk: Double = 0.9, rls: Double = 0.1): Array[Array[Double]] = {
     val width  = a(0).length
     val height = a   .length
     val c = if (out == null) Array.ofDim[Double](height, width) else out
@@ -137,7 +165,21 @@ object WaveletTest {
       while (x < width) {
         // val d = ac(x) hypotx bc(x)
         // val d = ac(x) absdif bc(x)
-        val d = ac(x) trunc bc(x)
+        // val d = ac(x) trunc bc(x)
+
+        // val d = ac(x) trunc  bc(x)
+        // val d = ac(x) excess bc(x)
+        // val d = if (x < 2 && y < 2) ac(x) else ac(x) * bc(x)
+        // val d0 = (ac(x) atan2 bc(x)) / math.Pi
+        // val d = d0 * ac(x) // math.min(d0, ac(x))
+        val d0    = ac(x) fold2 bc(x)
+        val prev  = cc(x)
+
+//        val w     = if (d0 > prev) atk else rls
+//        val d     = d0 * w + prev * (1 - w)
+        // val d = d0 + prev * 0.95
+        val d = if (d0 > prev) d0 else d0 * 0.1 + prev * 0.9
+
         // cc(x) = if (((x ^ y) % 2) == 0) ac(x) else bc(x)
         cc(x) = d
 
@@ -145,6 +187,7 @@ object WaveletTest {
       }
       y += 1
     }
+    c
   }
 
   def resize(in: Array[Array[Double]], wOut: Int, hOut: Int): Array[Array[Double]] = {
@@ -189,6 +232,41 @@ object WaveletTest {
   def writeImage2D(out: File, buf: Array[Array[Double]]): Unit = {
     val img = bufferToImage(buf)
     ImageIO.write(img, "png", out)
+  }
+
+  def normalize(in: Array[Array[Double]]): Unit = {
+    val w         = in(0).length
+    val h         = in   .length
+
+    var min = Double.MaxValue
+    var max = Double.MinValue
+    var y = 0
+    while (y < h) {
+      var x = 0
+      val inc = in(y)
+      while (x < w) {
+        val d = inc(x)
+        if (d < min) min = d
+        if (d > max) max = d
+        x += 1
+      }
+      y += 1
+    }
+
+    if (min >= max) return
+
+    val mul = 1.0 / max - min
+    val add = -min
+
+    while (y < h) {
+      var x = 0
+      val inc = in(y)
+      while (x < w) {
+        inc(x) = (inc(x) + add) * mul
+        x += 1
+      }
+      y += 1
+    }
   }
 
   def readImage2D(in: File): Array[Array[Double]] = {
