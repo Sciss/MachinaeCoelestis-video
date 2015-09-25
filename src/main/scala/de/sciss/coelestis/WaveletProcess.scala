@@ -9,11 +9,12 @@ import jwave.transforms.FastWaveletTransform
 import jwave.transforms.wavelets.daubechies.Daubechies8
 import numbers.Implicits._
 
-object WaveletTest {
+object WaveletProcess {
   final val DISPLACE = 64.0 // 8.0
-  final val NOISE    = 0.1
-  final val BOOST    = 4.0 // 1.3
-  final val CUT      = 0.1 // NOISE * BOOST
+  final val NOISE_IN = 0.1
+  final val NOISE_OUT = 0.1
+  final val BOOST    = 1.41 // 2.0 // 4.0 // 1.3
+  final val CUT      = 0.01 // 0.1 // NOISE * BOOST
 
   def main(args: Array[String]): Unit = {
     val wavelet = new Daubechies8
@@ -24,7 +25,7 @@ object WaveletTest {
 
     for (i <- 1 to 100) {
       val in1     = readImage2D(file(s"image_out2/frame_rsmp-${i + 5000}.png"))
-      if (NOISE > 0) addNoise(in1, NOISE)
+      if (NOISE_IN > 0) addNoise(in1, NOISE_IN)
       val w       = in1(0).length
       val h       = in1   .length
 
@@ -41,10 +42,14 @@ object WaveletTest {
       // normalize(mat1f)
       // normalize(mat2f)
       mix1(mat1f, mat2f, delay)
-      copy(delay, mat1f)
-      val mat3    = trans.reverse(delay)
+      mix2(mat1f, mat2f, mat1f)
+      mix3(delay, mat1f, mat1f, mul1 = 2.0, mul2 = 2.0)
+      val mat3    = trans.reverse(mat1f)
+      val mat4    = trans.reverse(delay)
+      mix3(mat4, mat3, mat3, mul1 = 4.0)
       val out1    = resize(mat3, w, h)
-      normalize(out1)
+      if (NOISE_OUT > 0) addNoise(out1, NOISE_OUT)
+      // normalize(out1)
       if (BOOST != 1 || CUT != 0) mulAdd(out1, BOOST, -CUT)
       writeImage2D(file(s"test_out/wavelet-F-$i.png"), out1)
     }
@@ -98,10 +103,15 @@ object WaveletTest {
     }
   }
 
-  def mix(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null): Unit = {
+  def mix2(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null,
+           skew: Double = 1.2, displace: Double = DISPLACE): Array[Array[Double]] = {
     val width  = a(0).length
     val height = a   .length
     val c = if (out == null) Array.ofDim[Double](height, width) else out
+
+    val wFact = math.pow(width , skew)
+    val hFact = math.pow(height, skew)
+
     var y = 0
     while (y < height) {
       // val ac = a(y)
@@ -119,12 +129,12 @@ object WaveletTest {
         val w1 = (x + 1).nextPowerOfTwo
         val w2 = (w1 + 1) >> 1
 
-        val displace  = bc(x) * DISPLACE// 2
-        val displaceX = x + displace * w2 / width
+        val _displace = bc(x) * displace// 2
+        val displaceX = x + _displace * w2 / wFact
         val wxj       = displaceX % 1.0
         val wxi       = 1.0 - wxj
 
-        val displaceY = y + displace * h2 / height
+        val displaceY = y + _displace * h2 / hFact
         val wyj       = displaceY % 1.0
         val wyi       = 1.0 - wyj
 
@@ -148,10 +158,11 @@ object WaveletTest {
       }
       y += 1
     }
+    c
   }
 
   def mix1(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null,
-           atk: Double = 0.9, rls: Double = 0.1): Array[Array[Double]] = {
+           lag: Double = 0.95): Array[Array[Double]] = {
     val width  = a(0).length
     val height = a   .length
     val c = if (out == null) Array.ofDim[Double](height, width) else out
@@ -178,11 +189,79 @@ object WaveletTest {
 //        val w     = if (d0 > prev) atk else rls
 //        val d     = d0 * w + prev * (1 - w)
         // val d = d0 + prev * 0.95
-        val d = if (d0 > prev) d0 else d0 * 0.1 + prev * 0.9
+        val d = if (d0 > prev) d0 else d0 * (1 - lag) + prev * lag
 
         // cc(x) = if (((x ^ y) % 2) == 0) ac(x) else bc(x)
         cc(x) = d
 
+        x += 1
+      }
+      y += 1
+    }
+    c
+  }
+
+  /** Binary maximum filter */
+  def mix3(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null,
+           mul1: Double = 1.0, mul2: Double = 1.0): Array[Array[Double]] = {
+    val width  = a(0).length
+    val height = a   .length
+    val c = if (out == null) Array.ofDim[Double](height, width) else out
+    var y = 0
+    while (y < height) {
+      val ac = a(y)
+      val bc = b(y)
+      val cc = c(y)
+      var x = 0
+
+      while (x < width) {
+        // val d = ac(x) hypotx bc(x)
+        // val d = ac(x) absdif bc(x)
+        // val d = ac(x) trunc bc(x)
+
+        // val d = ac(x) trunc  bc(x)
+        // val d = ac(x) excess bc(x)
+        // val d = if (x < 2 && y < 2) ac(x) else ac(x) * bc(x)
+        // val d0 = (ac(x) atan2 bc(x)) / math.Pi
+        // val d = d0 * ac(x) // math.min(d0, ac(x))
+        val ad    = ac(x) * mul1
+        val bd    = bc(x) * mul2
+        val d     = ad max bd
+        // val prev  = cc(x)
+
+        //        val w     = if (d0 > prev) atk else rls
+        //        val d     = d0 * w + prev * (1 - w)
+        // val d = d0 + prev * 0.95
+        // val d = if (d0 > prev) d0 else d0 * (1 - lag) + prev * lag
+
+        // cc(x) = if (((x ^ y) % 2) == 0) ac(x) else bc(x)
+        cc(x) = d
+
+        x += 1
+      }
+      y += 1
+    }
+    c
+  }
+
+  /** Binary addition filter */
+  def mix4(a: Array[Array[Double]], b: Array[Array[Double]], out: Array[Array[Double]] = null,
+           mul1: Double = 1.0, mul2: Double = 1.0): Array[Array[Double]] = {
+    val width  = a(0).length
+    val height = a   .length
+    val c = if (out == null) Array.ofDim[Double](height, width) else out
+    var y = 0
+    while (y < height) {
+      val ac = a(y)
+      val bc = b(y)
+      val cc = c(y)
+      var x = 0
+
+      while (x < width) {
+        val ad    = ac(x) * mul1
+        val bd    = bc(x) * mul2
+        val d     = ad + bd
+        cc(x) = d
         x += 1
       }
       y += 1
