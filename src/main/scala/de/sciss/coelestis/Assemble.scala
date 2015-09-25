@@ -7,11 +7,12 @@ import jwave.transforms.wavelets.daubechies.Daubechies8
 
 object Assemble {
   def main(args: Array[String]): Unit = {
-    mkScene1()
-    mkScene2()
-    mkScene3()
-    mkScene4()
-    // mkScene5()
+//    mkScene1()
+//    mkScene2()
+//    mkScene3()
+//    mkScene4()
+//    mkScene5()
+    mkScene6()
   }
 
   def mkInputFrame (i: Int): File = file("image_out2") / s"frame_rsmp-$i.png"
@@ -165,6 +166,22 @@ object Assemble {
         mix4(in, out1, out1, mul1 = (1 - fade1) * fade4, mul2 = fade1 * fade4)
 
         writeImage2D(out, out1)
+      }
+    }
+  }
+
+  /*
+
+    24201 ... 24250 two seconds black
+
+   */
+
+  def mkScene6(): Unit = {
+    for (i <- 24201 to 24250) {
+      val out = mkOutputFrame(i)
+      val in  = file("black_frame.png")
+      if (!out.exists()) {
+        mkLink(in = in, out = out)
       }
     }
   }
