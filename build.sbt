@@ -25,7 +25,7 @@ lazy val commonSettings = Seq(
     "de.sciss"          %  "prefuse-core"       % "1.0.0",
     "de.sciss"          %  "weblaf"             % "1.28",
     "com.github.scopt"  %% "scopt"              % "3.3.0",
-    "de.sciss"          %  "jwave"              % "1.0.2",
+    "de.sciss"          %  "jwave"              % "1.0.3",
     "de.sciss"          %  "intensitypalette"   % "1.0.0"
   )
 )
